@@ -46,10 +46,10 @@ func (m *money) String() string {
 	return fmt.Sprintf("%.0f %s", m.Amount, m.CurrencyCode)
 }
 
-func searchNotices(ctx context.Context, client *http.Client, apiKey string, pageSize int) (searchResponse, error) {
+func searchNotices(ctx context.Context, client *http.Client, apiKey string, pageSize int, baseURL string) (searchResponse, error) {
 	params := url.Values{}
 	params.Set("numHitsPerPage", strconv.Itoa(pageSize))
-	searchURL := "https://api.doffin.no/public/v2/search?" + params.Encode()
+	searchURL := baseURL + "/search?" + params.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, searchURL, nil)
 	if err != nil {
@@ -79,6 +79,7 @@ func searchNotices(ctx context.Context, client *http.Client, apiKey string, page
 }
 
 func main() {
+	baseURL := "https://api.doffin.no/public/v2"
 	apiKey := os.Getenv("DOFFIN_API_KEY")
 	if apiKey == "" {
 		log.Fatal("No API key found")
@@ -86,7 +87,7 @@ func main() {
 
 	client := &http.Client{Timeout: 10 * time.Second}
 
-	result, err := searchNotices(context.Background(), client, apiKey, 2)
+	result, err := searchNotices(context.Background(), client, apiKey, 2, baseURL)
 	if err != nil {
 		log.Fatalf("search notices: %v", err)
 	}
