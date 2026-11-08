@@ -80,12 +80,26 @@ func searchNotices(ctx context.Context, client *http.Client, apiKey string, page
 
 func main() {
 	baseURL := "https://api.doffin.no/public/v2"
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		log.Fatal("no Database URL found")
+	}
 	apiKey := os.Getenv("DOFFIN_API_KEY")
 	if apiKey == "" {
-		log.Fatal("No API key found")
+		log.Fatal("no API key found")
 	}
 
 	client := &http.Client{Timeout: 10 * time.Second}
+	pool, err := connectDB(context.Background(), databaseURL)
+	if err != nil {
+		log.Fatalf("connect to db: %v", err)
+	}
+	defer pool.Close()
+
+	if err := applySchema(context.Background(), pool); err != nil {
+		log.Fatal(err)
+	}
+	log.Print("schema applied")
 
 	result, err := searchNotices(context.Background(), client, apiKey, 2, baseURL)
 	if err != nil {
