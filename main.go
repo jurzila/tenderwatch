@@ -105,7 +105,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("search notices: %v", err)
 	}
+	var saved int
 	for _, n := range result.Hits {
-		fmt.Printf("%+v\n", n)
+		if err := saveNotice(context.Background(), pool, n); err != nil {
+			log.Printf("upsert failed for notice with ID %s: %v", n.ID, err)
+			continue
+		}
+		saved++
 	}
+	log.Printf("saved %d of %d notices", saved, len(result.Hits))
 }
