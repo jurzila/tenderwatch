@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -16,6 +17,18 @@ const upsertNoticeSQL = `
 INSERT INTO NOTICES (id, heading, type, status, issue_date, deadline, estimated_amount, currency)
 VALUES ($1, $2, $3, $4, $5, $6 ,$7 ,$8)
 ON CONFLICT (id) DO UPDATE SET heading = EXCLUDED.heading, type = EXCLUDED.type, status = EXCLUDED.status, issue_date = EXCLUDED.issue_date, deadline = EXCLUDED.deadline, estimated_amount = EXCLUDED.estimated_amount, currency = EXCLUDED.currency`
+
+type noticeSummary struct {
+	ID              string     `json:"id"`
+	Heading         string     `json:"heading"`
+	Deadline        *time.Time `json:"deadline"`
+	EstimatedAmount *float64   `json:"estimatedAmount" db:"estimated_amount"`
+	Currency        *string    `json:"currency"`
+}
+
+type pgStore struct {
+	pool *pgxpool.Pool
+}
 
 func connectDB(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 	pool, err := pgxpool.New(ctx, databaseURL)
@@ -101,4 +114,17 @@ func saveNotice(ctx context.Context, pool *pgxpool.Pool, n notice) error {
 	}
 
 	return tx.Commit(ctx)
+}
+
+func (s *pgStore) NoticesByCPV(ctx context.Context, prefix string) ([]noticeSummary, error) {
+	rows, err := s.pool.Query(ctx, `SELECT DISTINCT n.id, n.heading, n.deadline, n.estimated_amount, n.currency FROM notices n JOIN notice_cpv_codes ncc ON n.id = ncc.notice_id where ncc.cpv_code LIKE $1 || '%' ORDER BY n.deadline`, prefix)
+	if err != nil {
+		return nil, fmt.Errorf("query notices by cpv: %w", err)
+	}
+
+	notices, err := pgx.CollectRows(rows, pgx.RowToStructByName[noticeSummary])
+	if err != nil {
+		return nil, fmt.Errorf("qscan notices: %w", err)
+	}
+	return notices, nil
 }

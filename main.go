@@ -79,6 +79,10 @@ func searchNotices(ctx context.Context, client *http.Client, apiKey string, page
 }
 
 func main() {
+	if len(os.Args) < 2 {
+		log.Fatal("usage: tenderwatch <ingest|serve>")
+	}
+
 	baseURL := "https://api.doffin.no/public/v2"
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
@@ -101,17 +105,33 @@ func main() {
 	}
 	log.Print("schema applied")
 
-	result, err := searchNotices(context.Background(), client, apiKey, 2, baseURL)
-	if err != nil {
-		log.Fatalf("search notices: %v", err)
-	}
-	var saved int
-	for _, n := range result.Hits {
-		if err := saveNotice(context.Background(), pool, n); err != nil {
-			log.Printf("upsert failed for notice with ID %s: %v", n.ID, err)
-			continue
+	switch os.Args[1] {
+	case "ingest":
+		result, err := searchNotices(context.Background(), client, apiKey, 50, baseURL)
+		if err != nil {
+			log.Fatalf("search notices: %v", err)
 		}
-		saved++
+		var saved int
+		for _, n := range result.Hits {
+			if err := saveNotice(context.Background(), pool, n); err != nil {
+				log.Printf("upsert failed for notice with ID %s: %v", n.ID, err)
+				continue
+			}
+			saved++
+		}
+		log.Printf("saved %d of %d notices", saved, len(result.Hits))
+
+	case "serve":
+		app := &server{store: &pgStore{pool: pool}}
+		srv := &http.Server{
+			Addr:         ":8080",
+			Handler:      app.routes(),
+			ReadTimeout:  5 * time.Second,
+			WriteTimeout: 10 * time.Second,
+		}
+		log.Printf("listening on %s", srv.Addr)
+		log.Fatal(srv.ListenAndServe())
+	default:
+		log.Fatalf("unknown command %q", os.Args[1])
 	}
-	log.Printf("saved %d of %d notices", saved, len(result.Hits))
 }
