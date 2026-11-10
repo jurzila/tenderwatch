@@ -26,6 +26,13 @@ type noticeSummary struct {
 	Currency        *string    `json:"currency"`
 }
 
+type buyerTotal struct {
+	OrganizationID string   `json:"organizationId" db:"organization_id"`
+	Name           string   `json:"name"`
+	TotalEstimated *float64 `json:"totalEstimated" db:"total_estimated"`
+	NoticeCount    int     `json:"noticeCount" db:"total_notices"`
+}
+
 type pgStore struct {
 	pool *pgxpool.Pool
 }
@@ -124,7 +131,39 @@ func (s *pgStore) NoticesByCPV(ctx context.Context, prefix string) ([]noticeSumm
 
 	notices, err := pgx.CollectRows(rows, pgx.RowToStructByName[noticeSummary])
 	if err != nil {
-		return nil, fmt.Errorf("qscan notices: %w", err)
+		return nil, fmt.Errorf("scan notices: %w", err)
 	}
 	return notices, nil
+}
+
+func (s *pgStore) ClosingSoon(ctx context.Context, days int) ([]noticeSummary, error) {
+	rows, err := s.pool.Query(ctx, `SELECT n.id, n.heading, n.deadline, n.estimated_amount, n.currency FROM notices n where n.deadline BETWEEN now() AND now() + make_interval(days => $1) ORDER BY n.deadline`, days)
+	if err != nil {
+		return nil, fmt.Errorf("query notices by days: %w", err)
+	}
+
+	notices, err := pgx.CollectRows(rows, pgx.RowToStructByName[noticeSummary])
+	if err != nil {
+		return nil, fmt.Errorf("scan notices: %w", err)
+	}
+	return notices, nil
+}
+
+func (s *pgStore) TopBuyers(ctx context.Context, limit int) ([]buyerTotal, error) {
+	rows, err := s.pool.Query(ctx, `SELECT b.organization_id, b.name, SUM(n.estimated_amount) as total_estimated, COUNT(*) as total_notices
+		FROM buyers b
+		JOIN notice_buyers nb ON b.organization_id = nb.organization_id  
+		JOIN notices n ON n.id = nb.notice_id
+		GROUP BY b.organization_id, b.name
+		ORDER BY total_estimated desc nulls last
+		LIMIT $1`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("query notices by buyers: %w", err)
+	}
+
+	buyers, err := pgx.CollectRows(rows, pgx.RowToStructByName[buyerTotal])
+	if err != nil {
+		return nil, fmt.Errorf("scan buyers: %w", err)
+	}
+	return buyers, nil
 }

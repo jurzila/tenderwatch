@@ -12,11 +12,18 @@ import (
 
 type fakeStore struct {
 	notices []noticeSummary
+	buyers []buyerTotal
 	err     error
 }
 
 func (f *fakeStore) NoticesByCPV(ctx context.Context, prefix string) ([]noticeSummary, error) {
 	return f.notices, f.err
+}
+func (f *fakeStore) ClosingSoon(ctx context.Context, days int) ([]noticeSummary, error) {
+	return f.notices, f.err
+}
+func (f *fakeStore) TopBuyers(ctx context.Context, limit int) ([]buyerTotal, error) {
+	return f.buyers, f.err
 }
 
 func TestHandleNoticesByCPV(t *testing.T) {
