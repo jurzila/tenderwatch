@@ -88,10 +88,6 @@ func main() {
 	if databaseURL == "" {
 		log.Fatal("no Database URL found")
 	}
-	apiKey := os.Getenv("DOFFIN_API_KEY")
-	if apiKey == "" {
-		log.Fatal("no API key found")
-	}
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	pool, err := connectDB(context.Background(), databaseURL)
@@ -107,6 +103,10 @@ func main() {
 
 	switch os.Args[1] {
 	case "ingest":
+		apiKey := os.Getenv("DOFFIN_API_KEY")
+		if apiKey == "" {
+			log.Fatal("no API key found")
+		}
 		result, err := searchNotices(context.Background(), client, apiKey, 50, baseURL)
 		if err != nil {
 			log.Fatalf("search notices: %v", err)

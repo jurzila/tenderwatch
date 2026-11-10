@@ -53,13 +53,13 @@ func (s *server) handleNoticesByCPV(w http.ResponseWriter, r *http.Request) {
 func intParam(r *http.Request, name string, def, min, max int) (int, error) {
 	param := r.URL.Query().Get(name)
 	if param == "" {
-		return def, nil 
+		return def, nil
 	}
 	intValue, err := strconv.Atoi(param)
 	if err != nil {
 		return 0, fmt.Errorf("%s must be a number", name)
 	}
-	if intValue <= min || intValue > max {
+	if intValue < min || intValue > max {
 		return 0, fmt.Errorf("%s has to be between %d and %d", name, min, max)
 	}
 	return intValue, nil
